@@ -12,8 +12,8 @@ This document provides a detailed, dependency-ordered list of tasks to implement
 
 ## Phase 1: Project Setup & Environment
 
-- [x] **T001**: Initialize a new Wails project with the Svelte template in the repository root. This will create the `frontend/` directory and main Go files.
-- [x] **T002**: Create the `backend/` directory for the Python script and create an empty `backend/process_video.py` file.
+- [ ] **T001**: Initialize a new Wails project with the Svelte template in the repository root. This will create the `frontend/` directory and main Go files.
+- [ ] **T002**: Create the `backend/` directory for the Python script and create an empty `backend/process_video.py` file.
 - [ ] **T003**: Create the `backend/requirements.txt` file and add `opencv-python`, `tinydb`, and `mediapipe` to it.
 - [ ] **T004**: [P] In the `frontend/` directory, create basic UI components in Svelte for video file input, a placeholder for parameter controls, and a "Run Analysis" button.
 
