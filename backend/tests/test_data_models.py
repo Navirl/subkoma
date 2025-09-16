@@ -1,29 +1,4 @@
-
-import dataclasses
-from typing import List, Optional
-
-@dataclasses.dataclass
-class Keypoint:
-    x: int
-    y: int
-    name: Optional[str] = None
-
-@dataclasses.dataclass
-class FrameData:
-    frame_index: int
-    timestamp: float
-    motion_intensity_score: float
-    motion_state: str
-    keypoints: Optional[List[Keypoint]] = None
-
-@dataclasses.dataclass
-class AnalysisResult:
-    _id: int
-    source_video_path: str
-    output_video_path: str
-    analysis_timestamp: str
-    parameters: dict
-    frame_data: List[FrameData]
+from backend.data_models import Keypoint, FrameData, AnalysisResult
 
 def test_create_keypoint():
     keypoint = Keypoint(x=345, y=112, name="nose")
@@ -56,12 +31,12 @@ def test_create_analysis_result():
         keypoints=[keypoint]
     )
     analysis_result = AnalysisResult(
-        _id=1,
         source_video_path="C:/Users/animator/clips/scene01.mp4",
         output_video_path="C:/Users/animator/clips/processed/scene01_timed.mp4",
         analysis_timestamp="2025-09-15T14:30:00Z",
         parameters={ "threshold_high": 0.6 },
-        frame_data=[frame_data]
+        frame_data=[frame_data],
+        _id=1
     )
     assert analysis_result._id == 1
     assert analysis_result.source_video_path == "C:/Users/animator/clips/scene01.mp4"
