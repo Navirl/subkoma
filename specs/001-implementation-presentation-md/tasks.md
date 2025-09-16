@@ -12,17 +12,17 @@ This document provides a detailed, dependency-ordered list of tasks to implement
 
 ## Phase 1: Project Setup & Environment
 
-- [ ] **T001**: Initialize a new Wails project with the Svelte template in the repository root. This will create the `frontend/` directory and main Go files.
-- [ ] **T002**: Create the `backend/` directory for the Python script and create an empty `backend/process_video.py` file.
-- [ ] **T003**: Create the `backend/requirements.txt` file and add `opencv-python`, `tinydb`, and `mediapipe` to it.
-- [ ] **T004**: [P] In the `frontend/` directory, create basic UI components in Svelte for video file input, a placeholder for parameter controls, and a "Run Analysis" button.
+- [x] **T001**: Initialize a new Wails project with the Svelte template in the repository root. This will create the `frontend/` directory and main Go files.
+- [x] **T002**: Create the `backend/` directory for the Python script and create an empty `backend/process_video.py` file.
+- [x] **T003**: Create the `backend/requirements.txt` file and add `opencv-python`, `tinydb`, and `mediapipe` to it.
+- [x] **T004**: [P] In the `frontend/` directory, create basic UI components in Svelte for video file input, a placeholder for parameter controls, and a "Run Analysis" button.
 
 ## Phase 2: Backend Core & TDD
 
 **CRITICAL: Tests must be written and fail before their corresponding implementation.**
 
-- [ ] **T005**: [P] In `backend/`, create `tests/test_cli.py`. Write a test that uses `subprocess` to run `process_video.py` with mock arguments and asserts that it exits gracefully. This test MUST FAIL.
-- [ ] **T006**: [P] In `backend/`, create `tests/test_data_models.py`. Write tests to verify the creation of data structures representing the `AnalysisResult` and `FrameData` models from `data-model.md`.
+- [x] **T005**: [P] In `backend/`, create `tests/test_cli.py`. Write a test that uses `subprocess` to run `process_video.py` with mock arguments and asserts that it exits gracefully. This test MUST FAIL.
+- [x] **T006**: [P] In `backend/`, create `tests/test_data_models.py`. Write tests to verify the creation of data structures representing the `AnalysisResult` and `FrameData` models from `data-model.md`.
 - [ ] **T007**: In `backend/process_video.py`, implement the command-line argument parsing using `argparse` to satisfy the contract in `contracts/python_interface.md`. This should make test `T005` pass.
 - [ ] **T008**: In `backend/`, create `data_models.py` to define the Python classes or dataclasses for `AnalysisResult` and `FrameData`. This should make test `T006` pass.
 - [ ] **T009**: In `backend/`, create `tests/test_calculations.py`. Write failing tests for the feature calculation functions (e.g., displacement, velocity).
