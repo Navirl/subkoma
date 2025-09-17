@@ -15,7 +15,7 @@ try:
         calculate_displacement, calculate_velocity, calculate_acceleration,
         calculate_direction_change, calculate_pose_change, calculate_motion_intensity_score
     )
-    from backend.timing_logic import TimingLogicProcessor, MotionState
+    from backend.timing_logic import TimingLogicProcessor, MotionState, FrameTimingDecision
 except ImportError:
     # When running directly from backend directory
     from data_models import Keypoint, FrameData, AnalysisResult
@@ -23,7 +23,7 @@ except ImportError:
         calculate_displacement, calculate_velocity, calculate_acceleration,
         calculate_direction_change, calculate_pose_change, calculate_motion_intensity_score
     )
-    from timing_logic import TimingLogicProcessor, MotionState
+    from timing_logic import TimingLogicProcessor, MotionState, FrameTimingDecision
 
 
 def initialize_database(db_path: str = "analysis_results.json") -> TinyDB:
@@ -242,8 +242,84 @@ def process_video_pipeline(input_path: str, output_path: str, config: Dict[str, 
         frame_data=frame_data
     )
     
-    print("Analysis complete.", file=sys.stderr)
+    print("Analysis complete. Generating output video...", file=sys.stderr)
+    
+    # Generate the output video with timing decisions applied
+    generate_output_video(input_path, output_path, timing_decisions, fps)
+    
+    print("Output video generation complete.", file=sys.stderr)
     return analysis_result
+
+
+def generate_output_video(input_path: str, output_path: str, timing_decisions: List[FrameTimingDecision], fps: float) -> None:
+    """
+    Generate the output video applying frame timing decisions.
+    
+    Args:
+        input_path: Path to the input video file
+        output_path: Path where the output video will be saved
+        timing_decisions: List of FrameTimingDecision objects
+        fps: Original video frame rate
+    """
+    # Open input video
+    cap = cv2.VideoCapture(input_path)
+    if not cap.isOpened():
+        raise FileNotFoundError(f"Could not open input video file: {input_path}")
+    
+    # Get video properties
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    
+    # Define codec and create VideoWriter
+    # Use mp4v codec for MP4 files, or XVID for AVI files
+    if output_path.lower().endswith('.mp4'):
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    elif output_path.lower().endswith('.avi'):
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    else:
+        # Default to mp4v
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    
+    # Create VideoWriter with original fps (timing is controlled by frame repetition)
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    
+    if not out.isOpened():
+        cap.release()
+        raise RuntimeError(f"Could not create output video file: {output_path}")
+    
+    print(f"Generating output video: {width}x{height} at {fps} FPS", file=sys.stderr)
+    
+    frame_index = 0
+    total_output_frames = 0
+    
+    # Process each frame according to timing decisions
+    while frame_index < len(timing_decisions):
+        # Read the frame
+        ret, frame = cap.read()
+        if not ret:
+            print(f"Warning: Could not read frame {frame_index}, stopping video generation", file=sys.stderr)
+            break
+        
+        # Get timing decision for this frame
+        decision = timing_decisions[frame_index]
+        
+        # Write the frame multiple times based on timing_multiplier
+        for _ in range(decision.timing_multiplier):
+            out.write(frame)
+            total_output_frames += 1
+        
+        frame_index += 1
+        
+        # Progress reporting
+        if frame_index % 30 == 0:
+            progress = (frame_index / len(timing_decisions)) * 100
+            print(f"Video generation progress: {progress:.1f}% ({frame_index}/{len(timing_decisions)})", file=sys.stderr)
+    
+    # Release everything
+    cap.release()
+    out.release()
+    
+    print(f"Output video generated: {total_output_frames} frames written", file=sys.stderr)
 
 
 def main():

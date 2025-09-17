@@ -40,7 +40,7 @@ This document provides a detailed, dependency-ordered list of tasks to implement
     3. Use the functions from `calculations.py` to get the `MotionIntensity` score.
     4. Use the functions from `timing_logic.py` to get the final `MotionState`.
 - [x] **T016**: In `backend/process_video.py`, implement the TinyDB integration. Initialize the database and save the final `AnalysisResult` document upon successful processing.
-- [ ] **T017**: In `backend/process_video.py`, implement the final video generation loop using OpenCV's `VideoWriter`, applying the frame timing decisions from the `MotionState` of each frame.
+- [x] **T017**: In `backend/process_video.py`, implement the final video generation loop using OpenCV's `VideoWriter`, applying the frame timing decisions from the `MotionState` of each frame.
 - [ ] **T018**: In `backend/process_video.py`, ensure the final success or error JSON is printed to `stdout` or `stderr` as defined in the contract.
 
 ## Phase 4: UI Polish & Finalization
