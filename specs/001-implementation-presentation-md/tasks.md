@@ -26,7 +26,7 @@ This document provides a detailed, dependency-ordered list of tasks to implement
 - [x] **T007**: In `backend/process_video.py`, implement the command-line argument parsing using `argparse` to satisfy the contract in `contracts/python_interface.md`. This should make test `T005` pass.
 - [x] **T008**: In `backend/`, create `data_models.py` to define the Python classes or dataclasses for `AnalysisResult` and `FrameData`. This should make test `T006` pass.
 - [x] **T009**: In `backend/`, create `tests/test_calculations.py`. Write failing tests for the feature calculation functions (e.g., displacement, velocity).
-- [ ] **T010**: In `backend/`, create `calculations.py` and implement the feature calculation functions to make test `T009` pass.
+- [x] **T010**: In `backend/`, create `calculations.py` and implement the feature calculation functions to make test `T009` pass.
 - [ ] **T011**: In `backend/`, create `tests/test_timing_logic.py`. Write failing tests for the hysteresis and frame timing logic.
 - [ ] **T012**: In `backend/`, create `timing_logic.py` and implement the hysteresis and frame selection logic to make test `T011` pass.
 
