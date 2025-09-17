@@ -4,8 +4,10 @@ import sys
 import cv2
 import mediapipe as mp
 import numpy as np
+import os
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+from tinydb import TinyDB
 
 try:
     from backend.data_models import Keypoint, FrameData, AnalysisResult
@@ -22,6 +24,63 @@ except ImportError:
         calculate_direction_change, calculate_pose_change, calculate_motion_intensity_score
     )
     from timing_logic import TimingLogicProcessor, MotionState
+
+
+def initialize_database(db_path: str = "analysis_results.json") -> TinyDB:
+    """Initialize TinyDB database for storing analysis results."""
+    # Ensure the directory exists
+    db_dir = os.path.dirname(db_path)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir)
+    
+    return TinyDB(db_path)
+
+
+def save_analysis_result(analysis_result: AnalysisResult, db_path: str = "analysis_results.json") -> int:
+    """Save the AnalysisResult to TinyDB and return the document ID."""
+    db = initialize_database(db_path)
+    
+    # Convert the dataclass to a dictionary for TinyDB storage
+    # We need to handle nested dataclasses (FrameData and Keypoint)
+    result_dict = {
+        "source_video_path": analysis_result.source_video_path,
+        "output_video_path": analysis_result.output_video_path,
+        "analysis_timestamp": analysis_result.analysis_timestamp,
+        "parameters": analysis_result.parameters,
+        "frame_data": []
+    }
+    
+    # Convert frame data to dictionaries
+    for frame in analysis_result.frame_data:
+        frame_dict = {
+            "frame_index": frame.frame_index,
+            "timestamp": frame.timestamp,
+            "motion_intensity_score": frame.motion_intensity_score,
+            "motion_state": frame.motion_state,
+            "keypoints": None
+        }
+        
+        # Convert keypoints if they exist
+        if frame.keypoints:
+            frame_dict["keypoints"] = [
+                {
+                    "x": kp.x,
+                    "y": kp.y,
+                    "name": kp.name
+                }
+                for kp in frame.keypoints
+            ]
+        
+        result_dict["frame_data"].append(frame_dict)
+    
+    # Insert the document and get the ID
+    doc_id = db.insert(result_dict)
+    
+    # Update the analysis_result object with the database ID
+    analysis_result._id = doc_id
+    
+    db.close()
+    return doc_id
 
 
 def extract_keypoints_from_frame(frame: np.ndarray, pose_detector) -> List[Keypoint]:
@@ -205,11 +264,20 @@ def main():
         # Process the video
         analysis_result = process_video_pipeline(args.input, args.output, config)
         
+        # Save to database and get the ID
+        print("Saving analysis results to database...", file=sys.stderr)
+        try:
+            database_id = save_analysis_result(analysis_result)
+            print(f"Analysis saved with database ID: {database_id}", file=sys.stderr)
+        except Exception as db_error:
+            print(f"Warning: Failed to save to database: {db_error}", file=sys.stderr)
+            database_id = None
+        
         # Return success result
         result = {
             "status": "success",
             "output_video_path": args.output,
-            "database_id": "pending",  # Will be set by T016 when TinyDB is integrated
+            "database_id": database_id,
             "message": "Video processed successfully."
         }
         print(json.dumps(result))

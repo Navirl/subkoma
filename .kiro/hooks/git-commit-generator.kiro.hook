@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "name": "Git コミットメッセージ生成",
-  "description": "現在のgit変更内容を分析して、プロジェクトのコミットルール（[type]: [description]形式）に従った適切なコミットメッセージを日本語で生成します。変更されたファイルの種類と内容に基づいて、feat、fix、docs、build、refactor等の適切なtypeを選択し、簡潔で分かりやすい説明を付けます。",
+  "description": "現在のgit変更内容を分析して、プロジェクトのコミットルール（[type]: [description]形式）に従った適切なコミットメッセージを英語で生成します。変更されたファイルの種類と内容に基づいて、feat、fix、docs、build、refactor等の適切なtypeを選択し、簡潔で分かりやすい説明を付けます。",
   "version": "1",
   "when": {
     "type": "userTriggered",
@@ -11,6 +11,6 @@
   },
   "then": {
     "type": "askAgent",
-    "prompt": "現在のgit変更内容を分析して、プロジェクトのコミットルール（[type]: [description]形式）に従った適切なコミットメッセージを日本語で生成してください。変更されたファイルの種類と内容に基づいて、feat、fix、docs、build、refactor等の適切なtypeを選択し、簡潔で分かりやすい説明を付けてください。\n\n注意事項：\n- git diffコマンドは必ず `git --no-pager diff` を使用してページャーを無効化する\n- 新規ファイルの確認は `git ls-files --others --exclude-standard` を使用する\n- 生成したコミットメッセージをそのまま `git commit -m \"メッセージ\"` で実行する"
+    "prompt": "現在のgit変更内容を分析して、プロジェクトのコミットルール（[type]: [description]形式）に従った適切なコミットメッセージを英語で生成してください。変更されたファイルの種類と内容に基づいて、feat、fix、docs、build、refactor等の適切なtypeを選択し、簡潔で分かりやすい説明を付けてください。\n\n注意事項：\n- git diffコマンドは必ず `git --no-pager diff` を使用してページャーを無効化する\n- 新規ファイルの確認は `git ls-files --others --exclude-standard` を使用する\n- 生成したコミットメッセージをそのまま `git commit -m \"メッセージ\"` で実行する"
   }
 }

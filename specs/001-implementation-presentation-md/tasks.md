@@ -34,12 +34,12 @@ This document provides a detailed, dependency-ordered list of tasks to implement
 
 - [x] **T013**: In `main.go`, implement the Go function that will be called from the Svelte UI. This function should accept the video path and parameters.
 - [x] **T014**: In the Go function from `T013`, implement the call to execute the `backend/process_video.py` script synchronously using `os/exec`. It must pass the arguments correctly and wait for the result.
-- [ ] **T015**: In `backend/process_video.py`, integrate the full pipeline: 
+- [x] **T015**: In `backend/process_video.py`, integrate the full pipeline: 
     1. Read video frames using OpenCV.
     2. For each frame, run MediaPipe keypoint detection.
     3. Use the functions from `calculations.py` to get the `MotionIntensity` score.
     4. Use the functions from `timing_logic.py` to get the final `MotionState`.
-- [ ] **T016**: In `backend/process_video.py`, implement the TinyDB integration. Initialize the database and save the final `AnalysisResult` document upon successful processing.
+- [x] **T016**: In `backend/process_video.py`, implement the TinyDB integration. Initialize the database and save the final `AnalysisResult` document upon successful processing.
 - [ ] **T017**: In `backend/process_video.py`, implement the final video generation loop using OpenCV's `VideoWriter`, applying the frame timing decisions from the `MotionState` of each frame.
 - [ ] **T018**: In `backend/process_video.py`, ensure the final success or error JSON is printed to `stdout` or `stderr` as defined in the contract.
 
