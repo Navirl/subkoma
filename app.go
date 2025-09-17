@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // App struct
@@ -49,12 +50,12 @@ type ProcessVideoResponse struct {
 // ProcessVideo processes a video file using the Python backend
 // This function will be called from the Svelte UI
 func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
-	// Validate input parameters
+	// Enhanced input validation
 	if request.InputPath == "" {
 		return ProcessVideoResponse{
 			Status:    "error",
 			ErrorType: "ValidationError",
-			Message:   "Input path is required",
+			Message:   "Input video path is required. Please select a video file.",
 		}
 	}
 	
@@ -62,7 +63,7 @@ func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
 		return ProcessVideoResponse{
 			Status:    "error",
 			ErrorType: "ValidationError",
-			Message:   "Output path is required",
+			Message:   "Output path is required. Please specify where to save the processed video.",
 		}
 	}
 	
@@ -70,7 +71,32 @@ func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
 		return ProcessVideoResponse{
 			Status:    "error",
 			ErrorType: "ValidationError",
-			Message:   "Config is required",
+			Message:   "Analysis configuration is required. Please check your parameter settings.",
+		}
+	}
+	
+	// Validate input file exists and is accessible
+	if _, err := os.Stat(request.InputPath); os.IsNotExist(err) {
+		return ProcessVideoResponse{
+			Status:    "error",
+			ErrorType: "FileNotFoundError",
+			Message:   fmt.Sprintf("Input video file not found: %s. Please check the file path and try again.", request.InputPath),
+		}
+	} else if err != nil {
+		return ProcessVideoResponse{
+			Status:    "error",
+			ErrorType: "FileAccessError",
+			Message:   fmt.Sprintf("Cannot access input video file: %s. Error: %v", request.InputPath, err),
+		}
+	}
+	
+	// Validate config is valid JSON
+	var configTest interface{}
+	if err := json.Unmarshal([]byte(request.Config), &configTest); err != nil {
+		return ProcessVideoResponse{
+			Status:    "error",
+			ErrorType: "ConfigurationError",
+			Message:   fmt.Sprintf("Invalid configuration format: %v. Please reset parameters and try again.", err),
 		}
 	}
 	
@@ -80,7 +106,7 @@ func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
 		return ProcessVideoResponse{
 			Status:    "error",
 			ErrorType: "SystemError",
-			Message:   fmt.Sprintf("Failed to get working directory: %v", err),
+			Message:   fmt.Sprintf("System error: Failed to get working directory: %v", err),
 		}
 	}
 	
@@ -91,8 +117,23 @@ func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 		return ProcessVideoResponse{
 			Status:    "error",
-			ErrorType: "FileNotFoundError",
-			Message:   fmt.Sprintf("Python script not found at: %s", scriptPath),
+			ErrorType: "InstallationError",
+			Message:   fmt.Sprintf("Backend processing script not found at: %s. Please check your installation.", scriptPath),
+		}
+	}
+	
+	// Check if output directory exists and is writable
+	outputDir := filepath.Dir(request.OutputPath)
+	if outputDir != "" {
+		if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+			// Try to create the directory
+			if err := os.MkdirAll(outputDir, 0755); err != nil {
+				return ProcessVideoResponse{
+					Status:    "error",
+					ErrorType: "FileSystemError",
+					Message:   fmt.Sprintf("Cannot create output directory: %s. Error: %v", outputDir, err),
+				}
+			}
 		}
 	}
 	
@@ -104,36 +145,93 @@ func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
 		"--config", request.Config,
 	}
 	
-	// Execute the Python script synchronously
+	// Execute the Python script synchronously with enhanced error handling
 	cmd := exec.Command("python", args...)
 	cmd.Dir = workingDir
 	
 	// Capture both stdout and stderr
 	stdout, err := cmd.Output()
-	if err != nil {
-		// If there's an execution error, try to get stderr
-		if exitError, ok := err.(*exec.ExitError); ok {
-			stderr := string(exitError.Stderr)
-			
-			// Try to parse stderr as JSON error response
-			var errorResponse ProcessVideoResponse
-			if jsonErr := json.Unmarshal([]byte(stderr), &errorResponse); jsonErr == nil {
-				return errorResponse
+	var stderr []byte
+	
+	// Handle execution errors
+	cmdErr := err
+	
+	// Handle execution errors with detailed messages
+	if cmdErr != nil {
+		// Extract stderr from the error if it's an ExitError
+		if exitError, ok := cmdErr.(*exec.ExitError); ok {
+			stderr = exitError.Stderr
+		}
+		
+		stderrStr := string(stderr)
+		
+		// Try to parse stderr as JSON error response first
+		var errorResponse ProcessVideoResponse
+		if len(stderr) > 0 && json.Unmarshal(stderr, &errorResponse) == nil {
+			// Enhance the error message with more context
+			if errorResponse.Message != "" {
+				errorResponse.Message = fmt.Sprintf("Processing failed: %s", errorResponse.Message)
+			}
+			return errorResponse
+		}
+		
+		// Handle specific error types based on stderr content
+		if len(stderrStr) > 0 {
+			// Check for common error patterns
+			if contains(stderrStr, "FileNotFoundError") || contains(stderrStr, "No such file") {
+				return ProcessVideoResponse{
+					Status:    "error",
+					ErrorType: "FileNotFoundError",
+					Message:   fmt.Sprintf("File not found during processing. Details: %s", stderrStr),
+				}
+			} else if contains(stderrStr, "PermissionError") || contains(stderrStr, "Permission denied") {
+				return ProcessVideoResponse{
+					Status:    "error",
+					ErrorType: "PermissionError",
+					Message:   fmt.Sprintf("Permission denied. Please check file permissions. Details: %s", stderrStr),
+				}
+			} else if contains(stderrStr, "ModuleNotFoundError") || contains(stderrStr, "ImportError") {
+				return ProcessVideoResponse{
+					Status:    "error",
+					ErrorType: "DependencyError",
+					Message:   fmt.Sprintf("Missing required Python dependencies. Please install requirements. Details: %s", stderrStr),
+				}
+			} else if contains(stderrStr, "OutOfMemoryError") || contains(stderrStr, "MemoryError") {
+				return ProcessVideoResponse{
+					Status:    "error",
+					ErrorType: "MemoryError",
+					Message:   "Insufficient memory to process the video. Try with a smaller video file or close other applications.",
+				}
+			} else if contains(stderrStr, "cv2.error") || contains(stderrStr, "OpenCV") {
+				return ProcessVideoResponse{
+					Status:    "error",
+					ErrorType: "VideoProcessingError",
+					Message:   fmt.Sprintf("Video processing error. The video file may be corrupted or in an unsupported format. Details: %s", stderrStr),
+				}
 			}
 			
-			// If stderr is not valid JSON, return a generic error
+			// Generic error with stderr content
 			return ProcessVideoResponse{
 				Status:    "error",
 				ErrorType: "PythonExecutionError",
-				Message:   fmt.Sprintf("Python script failed: %s", stderr),
+				Message:   fmt.Sprintf("Processing failed with error: %s", stderrStr),
 			}
 		}
 		
-		// Other execution errors
+		// Error without stderr content
 		return ProcessVideoResponse{
 			Status:    "error",
 			ErrorType: "ExecutionError",
-			Message:   fmt.Sprintf("Failed to execute Python script: %v", err),
+			Message:   fmt.Sprintf("Python script execution failed: %v", cmdErr),
+		}
+	}
+	
+	// Handle successful execution
+	if len(stdout) == 0 {
+		return ProcessVideoResponse{
+			Status:    "error",
+			ErrorType: "OutputError",
+			Message:   "No output received from processing script. The process may have failed silently.",
 		}
 	}
 	
@@ -143,9 +241,28 @@ func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
 		return ProcessVideoResponse{
 			Status:    "error",
 			ErrorType: "ParseError",
-			Message:   fmt.Sprintf("Failed to parse Python script response: %v", err),
+			Message:   fmt.Sprintf("Failed to parse processing results: %v. Raw output: %s", err, string(stdout)),
 		}
 	}
 	
+	// Validate the response has required fields
+	if response.Status == "" {
+		return ProcessVideoResponse{
+			Status:    "error",
+			ErrorType: "ResponseError",
+			Message:   "Invalid response format from processing script.",
+		}
+	}
+	
+	// Enhance success message
+	if response.Status == "success" && response.Message == "" {
+		response.Message = "Video processing completed successfully."
+	}
+	
 	return response
+}
+
+// Helper function to check if a string contains a substring (case-insensitive)
+func contains(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }

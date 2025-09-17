@@ -71,8 +71,57 @@
   }
 
   async function runAnalysis() {
+    // Enhanced input validation
     if (!selectedVideoFile) {
-      alert("Please select a video file first.");
+      analysisResult = {
+        status: "error",
+        message: "Please select a video file first.",
+        errorType: "ValidationError"
+      };
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/quicktime', 'video/x-msvideo'];
+    if (selectedVideoFile.type && !allowedTypes.includes(selectedVideoFile.type)) {
+      analysisResult = {
+        status: "error",
+        message: `Unsupported video format: ${selectedVideoFile.type}. Please use MP4, AVI, or MOV files.`,
+        errorType: "ValidationError"
+      };
+      return;
+    }
+
+    // Validate file size (warn if > 100MB)
+    if (selectedVideoFile.size > 100 * 1024 * 1024) {
+      if (!confirm("The selected video file is quite large (>100MB). Processing may take a long time and use significant memory. Continue?")) {
+        return;
+      }
+    }
+
+    // Validate motion weights sum to approximately 1.0
+    if (weightWarning) {
+      if (!confirm("Motion weights don't sum to 1.0, which may affect analysis quality. Continue anyway?")) {
+        return;
+      }
+    }
+
+    // Validate threshold values
+    if (parameters.threshold_high <= parameters.threshold_low) {
+      analysisResult = {
+        status: "error",
+        message: "High threshold must be greater than low threshold. Please adjust your threshold settings.",
+        errorType: "ValidationError"
+      };
+      return;
+    }
+
+    if (parameters.threshold_high - parameters.threshold_low < parameters.hysteresis_margin) {
+      analysisResult = {
+        status: "error",
+        message: "Hysteresis margin is too large for the threshold range. Please reduce the hysteresis margin or increase the threshold range.",
+        errorType: "ValidationError"
+      };
       return;
     }
 
@@ -115,10 +164,33 @@
       
     } catch (error) {
       console.error("Error during analysis:", error);
+      
+      // Enhanced error handling with user-friendly messages
+      let errorMessage = "An unexpected error occurred during processing.";
+      let errorType = "UnexpectedError";
+      
+      if (error.message) {
+        if (error.message.includes("network") || error.message.includes("connection")) {
+          errorMessage = "Connection error. Please check your network connection and try again.";
+          errorType = "NetworkError";
+        } else if (error.message.includes("timeout")) {
+          errorMessage = "Processing timed out. The video may be too large or complex. Try with a smaller video file.";
+          errorType = "TimeoutError";
+        } else if (error.message.includes("permission")) {
+          errorMessage = "Permission denied. Please check file permissions and try again.";
+          errorType = "PermissionError";
+        } else if (error.message.includes("memory") || error.message.includes("out of memory")) {
+          errorMessage = "Insufficient memory. Please close other applications and try again, or use a smaller video file.";
+          errorType = "MemoryError";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       analysisResult = {
         status: "error",
-        message: error.message || error.toString(),
-        errorType: "UnexpectedError"
+        message: errorMessage,
+        errorType: errorType
       };
     } finally {
       isAnalyzing = false;
@@ -316,9 +388,57 @@
               <label>Error Message:</label>
               <span class="error-message">{analysisResult.message}</span>
             </div>
+            
+            <!-- Helpful suggestions based on error type -->
+            {#if analysisResult.errorType}
+              <div class="error-suggestions">
+                <label>Suggestions:</label>
+                <div class="suggestions-list">
+                  {#if analysisResult.errorType === "FileNotFoundError"}
+                    <div class="suggestion">• Check that the video file exists and hasn't been moved or deleted</div>
+                    <div class="suggestion">• Try selecting the video file again</div>
+                    <div class="suggestion">• Ensure the file path doesn't contain special characters</div>
+                  {:else if analysisResult.errorType === "PermissionError"}
+                    <div class="suggestion">• Check that you have read access to the video file</div>
+                    <div class="suggestion">• Check that you have write access to the output directory</div>
+                    <div class="suggestion">• Try running the application as administrator</div>
+                  {:else if analysisResult.errorType === "VideoProcessingError"}
+                    <div class="suggestion">• Try with a different video file to test if the issue is file-specific</div>
+                    <div class="suggestion">• Ensure the video is in a supported format (MP4, AVI, MOV)</div>
+                    <div class="suggestion">• Check if the video file is corrupted by playing it in a media player</div>
+                  {:else if analysisResult.errorType === "DependencyError"}
+                    <div class="suggestion">• Install required Python dependencies: pip install -r backend/requirements.txt</div>
+                    <div class="suggestion">• Check that Python is installed and accessible</div>
+                    <div class="suggestion">• Try reinstalling the application</div>
+                  {:else if analysisResult.errorType === "MemoryError"}
+                    <div class="suggestion">• Close other applications to free up memory</div>
+                    <div class="suggestion">• Try with a shorter or lower resolution video</div>
+                    <div class="suggestion">• Restart the application and try again</div>
+                  {:else if analysisResult.errorType === "ValidationError" || analysisResult.errorType === "ConfigurationError"}
+                    <div class="suggestion">• Reset parameters to defaults and try again</div>
+                    <div class="suggestion">• Check that motion weights sum to approximately 1.0</div>
+                    <div class="suggestion">• Ensure all threshold values are within valid ranges</div>
+                  {:else if analysisResult.errorType === "NetworkError"}
+                    <div class="suggestion">• Check your internet connection</div>
+                    <div class="suggestion">• Try again in a few moments</div>
+                  {:else if analysisResult.errorType === "TimeoutError"}
+                    <div class="suggestion">• Try with a shorter video file</div>
+                    <div class="suggestion">• Close other applications to improve performance</div>
+                    <div class="suggestion">• Check if your system meets the minimum requirements</div>
+                  {:else}
+                    <div class="suggestion">• Try restarting the application</div>
+                    <div class="suggestion">• Check the console for additional error details</div>
+                    <div class="suggestion">• Try with a different video file to isolate the issue</div>
+                  {/if}
+                </div>
+              </div>
+            {/if}
           </div>
           
           <div class="result-actions">
+            <button class="btn-secondary" on:click={resetToDefaults}>
+              Reset Parameters
+            </button>
             <button class="btn" on:click={() => analysisResult = null}>
               Clear Results
             </button>
@@ -730,6 +850,39 @@
     padding-top: 1em;
     border-top: 1px solid #e9ecef;
     text-align: center;
+    display: flex;
+    gap: 1em;
+    justify-content: center;
+  }
+
+  .error-suggestions {
+    margin-top: 1em;
+    padding: 1em;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #ffc107;
+  }
+
+  .error-suggestions label {
+    font-weight: 600;
+    color: #856404;
+    margin-bottom: 0.5em;
+    display: block;
+  }
+
+  .suggestions-list {
+    margin-top: 0.5em;
+  }
+
+  .suggestion {
+    color: #6c757d;
+    font-size: 0.9em;
+    margin-bottom: 0.3em;
+    line-height: 1.4;
+  }
+
+  .suggestion:last-child {
+    margin-bottom: 0;
   }
 
   @media (max-width: 768px) {
@@ -751,6 +904,11 @@
       flex-direction: column;
       gap: 0.5em;
       align-items: flex-start;
+    }
+
+    .result-actions {
+      flex-direction: column;
+      gap: 0.5em;
     }
   }
 

@@ -110,37 +110,57 @@ def extract_keypoints_from_frame(frame: np.ndarray, pose_detector) -> List[Keypo
 def process_video_pipeline(input_path: str, output_path: str, config: Dict[str, Any]) -> AnalysisResult:
     """Process video through the complete pipeline."""
     
-    # Initialize MediaPipe pose detection
-    mp_pose = mp.solutions.pose
-    pose_detector = mp_pose.Pose(
-        static_image_mode=False,
-        model_complexity=1,
-        enable_segmentation=False,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5
-    )
+    try:
+        # Initialize MediaPipe pose detection
+        mp_pose = mp.solutions.pose
+        pose_detector = mp_pose.Pose(
+            static_image_mode=False,
+            model_complexity=1,
+            enable_segmentation=False,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
+    except Exception as e:
+        raise ImportError(f"Failed to initialize MediaPipe pose detection: {e}")
     
-    # Initialize timing logic processor with config parameters
-    timing_processor = TimingLogicProcessor(
-        high_threshold=config.get('threshold_high', 0.60),
-        low_threshold=config.get('threshold_low', 0.35),
-        hysteresis_margin=config.get('hysteresis_margin', 0.05),
-        min_duration=config.get('min_duration', 0.08),
-        smoothing_method=config.get('smoothing_method', 'ema'),
-        smoothing_alpha=config.get('smoothing_alpha', 0.7),
-        enable_tame_tsume=config.get('enable_tame_tsume', False)
-    )
+    try:
+        # Initialize timing logic processor with config parameters
+        timing_processor = TimingLogicProcessor(
+            high_threshold=config.get('threshold_high', 0.60),
+            low_threshold=config.get('threshold_low', 0.35),
+            hysteresis_margin=config.get('hysteresis_margin', 0.05),
+            min_duration=config.get('min_duration', 0.08),
+            smoothing_method=config.get('smoothing_method', 'ema'),
+            smoothing_alpha=config.get('smoothing_alpha', 0.7),
+            enable_tame_tsume=config.get('enable_tame_tsume', False)
+        )
+    except Exception as e:
+        raise ValueError(f"Failed to initialize timing processor with given configuration: {e}")
     
-    # Open video
+    # Open video with enhanced error handling
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
-        raise FileNotFoundError(f"Could not open video file: {input_path}")
+        raise FileNotFoundError(f"Could not open video file: {input_path}. Please check if the file exists and is a valid video format.")
     
-    # Get video properties
+    # Get video properties and validate them
     fps = cap.get(cv2.CAP_PROP_FPS)
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
-    print(f"Processing video: {frame_count} frames at {fps} FPS", file=sys.stderr)
+    if fps <= 0:
+        cap.release()
+        raise ValueError(f"Invalid video frame rate: {fps}. The video file may be corrupted.")
+    
+    if frame_count <= 0:
+        cap.release()
+        raise ValueError(f"Invalid video frame count: {frame_count}. The video file may be corrupted or empty.")
+    
+    if width <= 0 or height <= 0:
+        cap.release()
+        raise ValueError(f"Invalid video dimensions: {width}x{height}. The video file may be corrupted.")
+    
+    print(f"Processing video: {frame_count} frames at {fps} FPS ({width}x{height})", file=sys.stderr)
     
     # Storage for frame analysis
     all_keypoints = []
@@ -331,14 +351,69 @@ def main():
     try:
         args = parser.parse_args()
         
-        # Parse config JSON
+        # Enhanced input validation
+        if not args.input:
+            raise ValueError("Input path cannot be empty")
+        
+        if not args.output:
+            raise ValueError("Output path cannot be empty")
+            
+        if not args.config:
+            raise ValueError("Configuration cannot be empty")
+        
+        # Validate input file exists and is accessible
+        if not os.path.exists(args.input):
+            raise FileNotFoundError(f"Input video file not found: {args.input}")
+        
+        if not os.access(args.input, os.R_OK):
+            raise PermissionError(f"Cannot read input video file: {args.input}")
+        
+        # Validate output directory exists or can be created
+        output_dir = os.path.dirname(args.output)
+        if output_dir and not os.path.exists(output_dir):
+            try:
+                os.makedirs(output_dir, exist_ok=True)
+            except OSError as e:
+                raise PermissionError(f"Cannot create output directory {output_dir}: {e}")
+        
+        # Check if output directory is writable
+        if output_dir and not os.access(output_dir, os.W_OK):
+            raise PermissionError(f"Cannot write to output directory: {output_dir}")
+        
+        # Parse and validate config JSON
         try:
             config = json.loads(args.config)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in config parameter: {e}")
         
+        # Validate config structure
+        required_keys = ['threshold_high', 'threshold_low', 'motion_weights']
+        for key in required_keys:
+            if key not in config:
+                print(f"Warning: Missing config key '{key}', using default value", file=sys.stderr)
+        
+        # Validate motion weights if present
+        if 'motion_weights' in config:
+            weights = config['motion_weights']
+            if not isinstance(weights, dict):
+                raise ValueError("motion_weights must be a dictionary")
+            
+            expected_weight_keys = ['displacement', 'velocity', 'acceleration', 'direction_change', 'pose_change']
+            for key in expected_weight_keys:
+                if key not in weights:
+                    print(f"Warning: Missing motion weight '{key}', using default value", file=sys.stderr)
+                elif not isinstance(weights[key], (int, float)):
+                    raise ValueError(f"Motion weight '{key}' must be a number")
+        
+        print(f"Starting video processing: {args.input}", file=sys.stderr)
+        print(f"Output will be saved to: {args.output}", file=sys.stderr)
+        
         # Process the video
         analysis_result = process_video_pipeline(args.input, args.output, config)
+        
+        # Verify output file was created
+        if not os.path.exists(args.output):
+            raise RuntimeError(f"Output video file was not created: {args.output}")
         
         # Save to database and get the ID
         print("Saving analysis results to database...", file=sys.stderr)
@@ -365,15 +440,70 @@ def main():
             error_result = {
                 "status": "error",
                 "error_type": "ArgumentError",
-                "message": f"Argument parsing failed."
+                "message": "Invalid command line arguments. Please check your input parameters."
             }
             print(json.dumps(error_result), file=sys.stderr)
             sys.exit(e.code)
-    except Exception as e:
+    except FileNotFoundError as e:
         error_result = {
             "status": "error",
-            "error_type": type(e).__name__,
+            "error_type": "FileNotFoundError",
             "message": str(e)
+        }
+        print(json.dumps(error_result), file=sys.stderr)
+        sys.exit(1)
+    except PermissionError as e:
+        error_result = {
+            "status": "error",
+            "error_type": "PermissionError",
+            "message": str(e)
+        }
+        print(json.dumps(error_result), file=sys.stderr)
+        sys.exit(1)
+    except ValueError as e:
+        error_result = {
+            "status": "error",
+            "error_type": "ValidationError",
+            "message": str(e)
+        }
+        print(json.dumps(error_result), file=sys.stderr)
+        sys.exit(1)
+    except ImportError as e:
+        error_result = {
+            "status": "error",
+            "error_type": "DependencyError",
+            "message": f"Missing required Python package: {e}. Please install dependencies with: pip install -r requirements.txt"
+        }
+        print(json.dumps(error_result), file=sys.stderr)
+        sys.exit(1)
+    except MemoryError as e:
+        error_result = {
+            "status": "error",
+            "error_type": "MemoryError",
+            "message": "Insufficient memory to process the video. Try with a smaller video file or close other applications."
+        }
+        print(json.dumps(error_result), file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        # Enhanced error reporting for unexpected errors
+        error_type = type(e).__name__
+        error_message = str(e)
+        
+        # Add context for common error types
+        if "cv2" in error_message.lower() or "opencv" in error_message.lower():
+            error_type = "VideoProcessingError"
+            error_message = f"Video processing failed: {error_message}. The video file may be corrupted or in an unsupported format."
+        elif "mediapipe" in error_message.lower():
+            error_type = "PoseDetectionError"
+            error_message = f"Pose detection failed: {error_message}. This may be due to an unsupported video format or corrupted frames."
+        elif "tinydb" in error_message.lower():
+            error_type = "DatabaseError"
+            error_message = f"Database operation failed: {error_message}. Check file permissions and disk space."
+        
+        error_result = {
+            "status": "error",
+            "error_type": error_type,
+            "message": error_message
         }
         print(json.dumps(error_result), file=sys.stderr)
         sys.exit(1)

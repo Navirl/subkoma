@@ -48,7 +48,7 @@ This document provides a detailed, dependency-ordered list of tasks to implement
 - [x] **T019**: [P] In the Svelte frontend, implement the real parameter controls (e.g., sliders for thresholds) and bind them to the data sent to the Go backend.
 - [x] **T020**: [P] In the Svelte frontend, implement a modal loading overlay that is triggered by the "Run Analysis" button and closed when a result (success or error) is received from the Go backend.
 - [x] **T021**: In the Svelte frontend, implement the results display area, showing the path to the output video and key analysis data.
-- [ ] **T022**: In `main.go` and the Svelte frontend, add robust error handling to display error messages received from the Python script.
+- [x] **T022**: In `main.go` and the Svelte frontend, add robust error handling to display error messages received from the Python script.
 
 ## Parallel Execution Example
 
