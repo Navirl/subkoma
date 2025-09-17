@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 )
 
 // App struct
@@ -70,10 +74,78 @@ func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
 		}
 	}
 	
-	// TODO: T014 will implement the actual Python script execution here
-	// For now, return a placeholder response
-	return ProcessVideoResponse{
-		Status:  "error",
-		Message: "Python script execution not yet implemented (T014)",
+	// Get the current working directory to construct the path to the Python script
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return ProcessVideoResponse{
+			Status:    "error",
+			ErrorType: "SystemError",
+			Message:   fmt.Sprintf("Failed to get working directory: %v", err),
+		}
 	}
+	
+	// Construct the path to the Python script
+	scriptPath := filepath.Join(workingDir, "backend", "process_video.py")
+	
+	// Check if the Python script exists
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		return ProcessVideoResponse{
+			Status:    "error",
+			ErrorType: "FileNotFoundError",
+			Message:   fmt.Sprintf("Python script not found at: %s", scriptPath),
+		}
+	}
+	
+	// Prepare the command arguments according to the contract
+	args := []string{
+		scriptPath,
+		"--input", request.InputPath,
+		"--output", request.OutputPath,
+		"--config", request.Config,
+	}
+	
+	// Execute the Python script synchronously
+	cmd := exec.Command("python", args...)
+	cmd.Dir = workingDir
+	
+	// Capture both stdout and stderr
+	stdout, err := cmd.Output()
+	if err != nil {
+		// If there's an execution error, try to get stderr
+		if exitError, ok := err.(*exec.ExitError); ok {
+			stderr := string(exitError.Stderr)
+			
+			// Try to parse stderr as JSON error response
+			var errorResponse ProcessVideoResponse
+			if jsonErr := json.Unmarshal([]byte(stderr), &errorResponse); jsonErr == nil {
+				return errorResponse
+			}
+			
+			// If stderr is not valid JSON, return a generic error
+			return ProcessVideoResponse{
+				Status:    "error",
+				ErrorType: "PythonExecutionError",
+				Message:   fmt.Sprintf("Python script failed: %s", stderr),
+			}
+		}
+		
+		// Other execution errors
+		return ProcessVideoResponse{
+			Status:    "error",
+			ErrorType: "ExecutionError",
+			Message:   fmt.Sprintf("Failed to execute Python script: %v", err),
+		}
+	}
+	
+	// Parse the successful response from stdout
+	var response ProcessVideoResponse
+	if err := json.Unmarshal(stdout, &response); err != nil {
+		return ProcessVideoResponse{
+			Status:    "error",
+			ErrorType: "ParseError",
+			Message:   fmt.Sprintf("Failed to parse Python script response: %v", err),
+		}
+	}
+	
+	return response
 }

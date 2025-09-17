@@ -33,7 +33,7 @@ This document provides a detailed, dependency-ordered list of tasks to implement
 ## Phase 3: Integration & Implementation
 
 - [x] **T013**: In `main.go`, implement the Go function that will be called from the Svelte UI. This function should accept the video path and parameters.
-- [ ] **T014**: In the Go function from `T013`, implement the call to execute the `backend/process_video.py` script synchronously using `os/exec`. It must pass the arguments correctly and wait for the result.
+- [x] **T014**: In the Go function from `T013`, implement the call to execute the `backend/process_video.py` script synchronously using `os/exec`. It must pass the arguments correctly and wait for the result.
 - [ ] **T015**: In `backend/process_video.py`, integrate the full pipeline: 
     1. Read video frames using OpenCV.
     2. For each frame, run MediaPipe keypoint detection.
