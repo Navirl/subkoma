@@ -4,6 +4,7 @@
   
   let selectedVideoFile = null;
   let videoFileName = "No video selected";
+  let isAnalyzing = false;
 
   // Analysis parameters with default values
   let parameters = {
@@ -74,6 +75,8 @@
       return;
     }
 
+    isAnalyzing = true;
+
     try {
       // Create output path based on input file
       const inputPath = selectedVideoFile.path || selectedVideoFile.name;
@@ -100,6 +103,8 @@
     } catch (error) {
       console.error("Error during analysis:", error);
       alert(`Error: ${error.message || error}`);
+    } finally {
+      isAnalyzing = false;
     }
   }
 </script>
@@ -225,8 +230,22 @@
 
   <div class="card">
     <h2>3. Run</h2>
-    <button class="btn run-btn" on:click={runAnalysis}>Run Analysis</button>
+    <button class="btn run-btn" on:click={runAnalysis} disabled={isAnalyzing}>
+      {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
+    </button>
   </div>
+
+  <!-- Loading Modal Overlay -->
+  {#if isAnalyzing}
+    <div class="modal-overlay">
+      <div class="modal-content">
+        <div class="spinner"></div>
+        <h3>Processing Video</h3>
+        <p>Analyzing frames and applying timing adjustments...</p>
+        <p class="modal-note">This may take several minutes depending on video length.</p>
+      </div>
+    </div>
+  {/if}
 
 </main>
 
@@ -416,6 +435,74 @@
     .param-grid {
       grid-template-columns: 1fr 1fr;
     }
+  }
+
+  /* Modal Loading Overlay */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+  }
+
+  .modal-content {
+    background-color: var(--card-background);
+    border-radius: var(--border-radius);
+    padding: 2em;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    max-width: 400px;
+    width: 90%;
+  }
+
+  .modal-content h3 {
+    color: var(--primary-color);
+    margin: 1em 0 0.5em 0;
+  }
+
+  .modal-content p {
+    margin: 0.5em 0;
+    color: var(--text-color);
+  }
+
+  .modal-note {
+    font-size: 0.9em;
+    color: #666;
+    font-style: italic;
+  }
+
+  /* Spinner Animation */
+  .spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1em auto;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Disabled button state */
+  .btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .btn:disabled:hover {
+    background-color: #ccc;
   }
 
 </style>
