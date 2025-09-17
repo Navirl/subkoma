@@ -5,6 +5,7 @@
   let selectedVideoFile = null;
   let videoFileName = "No video selected";
   let isAnalyzing = false;
+  let analysisResult = null;
 
   // Analysis parameters with default values
   let parameters = {
@@ -76,6 +77,7 @@
     }
 
     isAnalyzing = true;
+    analysisResult = null; // Clear previous results
 
     try {
       // Create output path based on input file
@@ -95,14 +97,29 @@
       const response = await ProcessVideo(request);
       
       if (response.status === "success") {
-        alert(`Analysis completed successfully!\nOutput: ${response.output_video_path}`);
+        analysisResult = {
+          status: "success",
+          outputVideoPath: response.output_video_path,
+          databaseId: response.database_id,
+          message: response.message,
+          inputPath: inputPath,
+          analysisTime: new Date().toLocaleString()
+        };
       } else {
-        alert(`Analysis failed: ${response.message}`);
+        analysisResult = {
+          status: "error",
+          message: response.message,
+          errorType: response.error_type
+        };
       }
       
     } catch (error) {
       console.error("Error during analysis:", error);
-      alert(`Error: ${error.message || error}`);
+      analysisResult = {
+        status: "error",
+        message: error.message || error.toString(),
+        errorType: "UnexpectedError"
+      };
     } finally {
       isAnalyzing = false;
     }
@@ -234,6 +251,82 @@
       {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
     </button>
   </div>
+
+  <!-- Results Display Area -->
+  {#if analysisResult}
+    <div class="card results-card">
+      <h2>4. Results</h2>
+      
+      {#if analysisResult.status === "success"}
+        <div class="results-success">
+          <div class="result-header">
+            <span class="status-badge success">✓ Analysis Complete</span>
+            <span class="analysis-time">{analysisResult.analysisTime}</span>
+          </div>
+          
+          <div class="result-details">
+            <div class="result-item">
+              <label>Input Video:</label>
+              <span class="file-path">{analysisResult.inputPath}</span>
+            </div>
+            
+            <div class="result-item">
+              <label>Output Video:</label>
+              <span class="file-path">{analysisResult.outputVideoPath}</span>
+              <button class="btn-small" on:click={() => navigator.clipboard.writeText(analysisResult.outputVideoPath)}>
+                Copy Path
+              </button>
+            </div>
+            
+            {#if analysisResult.databaseId}
+              <div class="result-item">
+                <label>Database ID:</label>
+                <span class="database-id">{analysisResult.databaseId}</span>
+              </div>
+            {/if}
+            
+            <div class="result-item">
+              <label>Status:</label>
+              <span class="success-message">{analysisResult.message}</span>
+            </div>
+          </div>
+          
+          <div class="result-actions">
+            <button class="btn" on:click={() => analysisResult = null}>
+              Clear Results
+            </button>
+          </div>
+        </div>
+      {:else}
+        <div class="results-error">
+          <div class="result-header">
+            <span class="status-badge error">✗ Analysis Failed</span>
+            <span class="analysis-time">{new Date().toLocaleString()}</span>
+          </div>
+          
+          <div class="result-details">
+            {#if analysisResult.errorType}
+              <div class="result-item">
+                <label>Error Type:</label>
+                <span class="error-type">{analysisResult.errorType}</span>
+              </div>
+            {/if}
+            
+            <div class="result-item">
+              <label>Error Message:</label>
+              <span class="error-message">{analysisResult.message}</span>
+            </div>
+          </div>
+          
+          <div class="result-actions">
+            <button class="btn" on:click={() => analysisResult = null}>
+              Clear Results
+            </button>
+          </div>
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   <!-- Loading Modal Overlay -->
   {#if isAnalyzing}
@@ -503,6 +596,162 @@
 
   .btn:disabled:hover {
     background-color: #ccc;
+  }
+
+  /* Results Display Styles */
+  .results-card {
+    border-left: 4px solid var(--primary-color);
+  }
+
+  .results-success {
+    background-color: #f8fff8;
+    border: 1px solid #d4edda;
+    border-radius: var(--border-radius);
+    padding: 1em;
+  }
+
+  .results-error {
+    background-color: #fff8f8;
+    border: 1px solid #f5c6cb;
+    border-radius: var(--border-radius);
+    padding: 1em;
+  }
+
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1em;
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid #e9ecef;
+  }
+
+  .status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9em;
+  }
+
+  .status-badge.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+
+  .status-badge.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
+
+  .analysis-time {
+    font-size: 0.85em;
+    color: #6c757d;
+    font-style: italic;
+  }
+
+  .result-details {
+    margin: 1em 0;
+  }
+
+  .result-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.75em;
+    gap: 1em;
+  }
+
+  .result-item label {
+    font-weight: 600;
+    min-width: 120px;
+    color: var(--text-color);
+  }
+
+  .file-path {
+    font-family: monospace;
+    background-color: #f8f9fa;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+    flex: 1;
+    word-break: break-all;
+    font-size: 0.9em;
+  }
+
+  .database-id {
+    font-family: monospace;
+    background-color: #e3f2fd;
+    color: #1565c0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #bbdefb;
+    font-weight: 600;
+  }
+
+  .success-message {
+    color: #155724;
+    font-weight: 500;
+  }
+
+  .error-type {
+    font-family: monospace;
+    background-color: #fff3cd;
+    color: #856404;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #ffeaa7;
+    font-weight: 600;
+  }
+
+  .error-message {
+    color: #721c24;
+    font-weight: 500;
+    flex: 1;
+  }
+
+  .btn-small {
+    padding: 4px 8px;
+    font-size: 0.8em;
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .btn-small:hover {
+    background-color: #5a6268;
+  }
+
+  .result-actions {
+    margin-top: 1em;
+    padding-top: 1em;
+    border-top: 1px solid #e9ecef;
+    text-align: center;
+  }
+
+  @media (max-width: 768px) {
+    .result-item {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5em;
+    }
+
+    .result-item label {
+      min-width: auto;
+    }
+
+    .file-path {
+      width: 100%;
+    }
+
+    .result-header {
+      flex-direction: column;
+      gap: 0.5em;
+      align-items: flex-start;
+    }
   }
 
 </style>
