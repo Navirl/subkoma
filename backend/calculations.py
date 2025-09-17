@@ -1,6 +1,9 @@
 import numpy as np
 from typing import List, Dict, Optional
-from backend.data_models import Keypoint
+try:
+    from backend.data_models import Keypoint
+except ImportError:
+    from data_models import Keypoint
 
 
 def calculate_displacement(keypoints_current: List[Keypoint], keypoints_previous: List[Keypoint]) -> List[float]:
