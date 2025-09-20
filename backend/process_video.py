@@ -9,6 +9,13 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from tinydb import TinyDB
 
+# Debug support
+try:
+    import debugpy
+    DEBUGPY_AVAILABLE = True
+except ImportError:
+    DEBUGPY_AVAILABLE = False
+
 try:
     from backend.data_models import Keypoint, FrameData, AnalysisResult
     from backend.calculations import (
@@ -347,9 +354,29 @@ def main():
     parser.add_argument('--input', type=str, required=True, help='The absolute path to the source video file.')
     parser.add_argument('--output', type=str, required=True, help='The absolute path where the processed video will be saved.')
     parser.add_argument('--config', type=str, required=True, help='A JSON string containing analysis parameters.')
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode - starts debugpy server')
+    parser.add_argument('--debug-port', type=int, default=5678, help='Port for debug server (default: 5678)')
+    parser.add_argument('--debug-wait', action='store_true', help='Wait for debugger to attach before starting')
 
     try:
         args = parser.parse_args()
+        
+        # Initialize debug server if requested
+        if args.debug and DEBUGPY_AVAILABLE:
+            try:
+                # Check if debugpy is already listening
+                if not debugpy.is_client_connected():
+                    debugpy.listen(("localhost", args.debug_port))
+                    print(f"Debug server started on port {args.debug_port}", file=sys.stderr)
+                    
+                    if args.debug_wait:
+                        print("Waiting for debugger to attach...", file=sys.stderr)
+                        debugpy.wait_for_client()
+                        print("Debugger attached!", file=sys.stderr)
+            except Exception as debug_error:
+                print(f"Warning: Failed to start debug server: {debug_error}", file=sys.stderr)
+        elif args.debug and not DEBUGPY_AVAILABLE:
+            print("Warning: debugpy not available. Install with: pip install debugpy", file=sys.stderr)
         
         # Enhanced input validation
         if not args.input:

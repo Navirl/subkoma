@@ -145,6 +145,19 @@ func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
 		"--config", request.Config,
 	}
 	
+	// Add debug flags if environment variable is set
+	if os.Getenv("PYTHON_DEBUG") == "true" {
+		args = append(args, "--debug")
+		// Optionally wait for debugger
+		if os.Getenv("PYTHON_DEBUG_WAIT") == "true" {
+			args = append(args, "--debug-wait")
+		}
+		// Custom debug port
+		if port := os.Getenv("PYTHON_DEBUG_PORT"); port != "" {
+			args = append(args, "--debug-port", port)
+		}
+	}
+	
 	// Execute the Python script synchronously with enhanced error handling
 	cmd := exec.Command("python", args...)
 	cmd.Dir = workingDir

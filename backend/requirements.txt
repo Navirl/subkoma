@@ -3,3 +3,4 @@ tinydb
 mediapipe
 pytest
 numpy
+debugpy
