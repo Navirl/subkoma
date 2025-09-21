@@ -112,15 +112,16 @@ func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
 		}
 	}
 	
-	// Construct the path to the Python script
-	scriptPath := filepath.Join(workingDir, "backend", "process_video.py")
+	// Construct the path to the Python script (relative to backend directory)
+	scriptPath := "process_video.py"
+	fullScriptPath := filepath.Join(workingDir, "backend", "process_video.py")
 	
 	// Check if the Python script exists
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+	if _, err := os.Stat(fullScriptPath); os.IsNotExist(err) {
 		return ProcessVideoResponse{
 			Status:    "error",
 			ErrorType: "InstallationError",
-			Message:   fmt.Sprintf("Backend processing script not found at: %s. Please check your installation.", scriptPath),
+			Message:   fmt.Sprintf("Backend processing script not found at: %s. Please check your installation.", fullScriptPath),
 		}
 	}
 	
@@ -163,7 +164,7 @@ func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
 	// Execute the Python script using uv run for proper virtual environment handling
 	uvArgs := append([]string{"run", "python"}, args...)
 	cmd := exec.Command("uv", uvArgs...)
-	cmd.Dir = workingDir
+	cmd.Dir = filepath.Join(workingDir, "backend") // Set working directory to backend folder
 	
 	// Capture both stdout and stderr
 	stdout, err := cmd.Output()
