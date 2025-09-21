@@ -9,3 +9,7 @@ export function Greet(arg1) {
 export function ProcessVideo(arg1) {
   return window['go']['main']['App']['ProcessVideo'](arg1);
 }
+
+export function SelectVideoFile() {
+  return window['go']['main']['App']['SelectVideoFile']();
+}

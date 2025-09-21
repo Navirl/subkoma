@@ -5,3 +5,5 @@ import {main} from '../models';
 export function Greet(arg1:string):Promise<string>;
 
 export function ProcessVideo(arg1:main.ProcessVideoRequest):Promise<main.ProcessVideoResponse>;
+
+export function SelectVideoFile():Promise<string>;

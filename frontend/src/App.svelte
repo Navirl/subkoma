@@ -1,8 +1,9 @@
 <script>
-  import { ProcessVideo } from '../wailsjs/go/main/App.js';
+  import { ProcessVideo, SelectVideoFile } from '../wailsjs/go/main/App.js';
   import { main } from '../wailsjs/go/models.ts';
   
   let selectedVideoFile = null;
+  let selectedVideoPath = "";
   let videoFileName = "No video selected";
   let isAnalyzing = false;
   let analysisResult = null;
@@ -39,14 +40,27 @@
   $: totalWeight = Object.values(parameters.motion_weights).reduce((sum, weight) => sum + weight, 0);
   $: weightWarning = Math.abs(totalWeight - 1.0) > 0.01;
 
-  function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (file) {
-      selectedVideoFile = file;
-      videoFileName = file.name;
-    } else {
-      selectedVideoFile = null;
-      videoFileName = "No video selected";
+  async function handleFileSelect() {
+    try {
+      const result = await SelectVideoFile();
+      
+      if (result && result.trim() !== "") {
+        selectedVideoPath = result;
+        videoFileName = result.split(/[\\/]/).pop(); // Extract filename from path
+        selectedVideoFile = { name: videoFileName, path: result };
+        
+        // Clear any previous error results
+        if (analysisResult && analysisResult.status === "error") {
+          analysisResult = null;
+        }
+      }
+    } catch (error) {
+      console.error("Error selecting file:", error);
+      analysisResult = {
+        status: "error",
+        message: "Failed to select file. Please try again.",
+        errorType: "FileSelectionError"
+      };
     }
   }
 
@@ -72,7 +86,7 @@
 
   async function runAnalysis() {
     // Enhanced input validation
-    if (!selectedVideoFile) {
+    if (!selectedVideoFile || !selectedVideoPath) {
       analysisResult = {
         status: "error",
         message: "Please select a video file first.",
@@ -81,22 +95,16 @@
       return;
     }
 
-    // Validate file type
-    const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/quicktime', 'video/x-msvideo'];
-    if (selectedVideoFile.type && !allowedTypes.includes(selectedVideoFile.type)) {
+    // Validate file extension
+    const allowedExtensions = ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm'];
+    const fileExtension = selectedVideoPath.toLowerCase().substring(selectedVideoPath.lastIndexOf('.'));
+    if (!allowedExtensions.includes(fileExtension)) {
       analysisResult = {
         status: "error",
-        message: `Unsupported video format: ${selectedVideoFile.type}. Please use MP4, AVI, or MOV files.`,
+        message: `Unsupported video format: ${fileExtension}. Please use MP4, AVI, MOV, MKV, WMV, FLV, or WebM files.`,
         errorType: "ValidationError"
       };
       return;
-    }
-
-    // Validate file size (warn if > 100MB)
-    if (selectedVideoFile.size > 100 * 1024 * 1024) {
-      if (!confirm("The selected video file is quite large (>100MB). Processing may take a long time and use significant memory. Continue?")) {
-        return;
-      }
     }
 
     // Validate motion weights sum to approximately 1.0
@@ -130,7 +138,7 @@
 
     try {
       // Create output path based on input file
-      const inputPath = selectedVideoFile.path || selectedVideoFile.name;
+      const inputPath = selectedVideoPath;
       const outputPath = inputPath.replace(/\.[^/.]+$/, "_processed.mp4");
       
       // Create the request object
@@ -204,8 +212,7 @@
   <div class="card">
     <h2>1. Select Video</h2>
     <div class="input-box">
-      <input type="file" id="video-input" accept="video/*" on:change={handleFileSelect} style="display: none;">
-      <label for="video-input" class="btn">Choose File</label>
+      <button class="btn" on:click={handleFileSelect}>Choose File</button>
       <span class="file-name">{videoFileName}</span>
     </div>
   </div>

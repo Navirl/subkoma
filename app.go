@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -158,8 +160,9 @@ func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
 		}
 	}
 	
-	// Execute the Python script synchronously with enhanced error handling
-	cmd := exec.Command("python", args...)
+	// Execute the Python script using uv run for proper virtual environment handling
+	uvArgs := append([]string{"run", "python"}, args...)
+	cmd := exec.Command("uv", uvArgs...)
 	cmd.Dir = workingDir
 	
 	// Capture both stdout and stderr
@@ -273,6 +276,30 @@ func (a *App) ProcessVideo(request ProcessVideoRequest) ProcessVideoResponse {
 	}
 	
 	return response
+}
+
+// SelectVideoFile opens a file dialog to select a video file
+func (a *App) SelectVideoFile() (string, error) {
+	options := runtime.OpenDialogOptions{
+		Title: "Select Video File",
+		Filters: []runtime.FileFilter{
+			{
+				DisplayName: "Video Files",
+				Pattern:     "*.mp4;*.avi;*.mov;*.mkv;*.wmv;*.flv;*.webm",
+			},
+			{
+				DisplayName: "All Files",
+				Pattern:     "*",
+			},
+		},
+	}
+
+	filePath, err := runtime.OpenFileDialog(a.ctx, options)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file dialog: %v", err)
+	}
+
+	return filePath, nil
 }
 
 // Helper function to check if a string contains a substring (case-insensitive)
