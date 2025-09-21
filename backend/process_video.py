@@ -445,8 +445,14 @@ def main():
         # Save to database and get the ID
         print("Saving analysis results to database...", file=sys.stderr)
         try:
-            database_id = save_analysis_result(analysis_result)
+            # Create database path in the same directory as input video
+            input_dir = os.path.dirname(args.input)
+            input_filename = os.path.splitext(os.path.basename(args.input))[0]
+            db_path = os.path.join(input_dir, f"{input_filename}_analysis.json")
+            
+            database_id = save_analysis_result(analysis_result, db_path)
             print(f"Analysis saved with database ID: {database_id}", file=sys.stderr)
+            print(f"Database saved to: {db_path}", file=sys.stderr)
         except Exception as db_error:
             print(f"Warning: Failed to save to database: {db_error}", file=sys.stderr)
             database_id = None
@@ -455,7 +461,7 @@ def main():
         result = {
             "status": "success",
             "output_video_path": args.output,
-            "database_id": database_id,
+            "database_id": str(database_id) if database_id is not None else None,
             "message": "Video processed successfully."
         }
         print(json.dumps(result))
